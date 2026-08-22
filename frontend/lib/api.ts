@@ -6,7 +6,7 @@ const API = axios.create({
 
 // Students
 export const getStudents = () => API.get("/students/")
-export const createStudent = (data: { name: string; email: string; photo?: string }) =>
+export const createStudent = (data: { name: string; email: string; photo?: string; batch_id: number }) =>
   API.post("/students/", data)
 export const deleteStudent = (id: number) => API.delete(`/students/${id}`)
 export const studentLogin = (email: string) =>
@@ -27,6 +27,13 @@ export const getLeaderboard = () => API.get("/scores/leaderboard/today")
 export const getWeeklyLeaderboard = () => API.get("/scores/leaderboard/weekly")
 export const getMonthlyLeaderboard = () => API.get("/scores/leaderboard/monthly")
 export const getStudentOfDay = () => API.get("/scores/student-of-the-day")
+
+// Batches
+export const getBatches = () => API.get("/batches/")
+export const getActiveBatches = () => API.get("/batches/active")
+export const createBatch = (data: { name: string }) => API.post("/batches/", data)
+export const endBatch = (id: number) => API.patch(`/batches/${id}/end`)
+
 // Project Updates
 export const createProjectUpdate = (data: any) => API.post("/project-updates/", data)
 export const getMyProjectUpdates = (studentId: number) => API.get(`/project-updates/student/${studentId}`)
