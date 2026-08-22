@@ -8,6 +8,37 @@ const nowTime = () => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
 }
 
+// Converts ANY uploaded image (heic, png, webp, etc.) to a safe JPEG data URL via canvas.
+// This guarantees the backend/Excel export can always read it.
+const normalizeImageToJpeg = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const img = new Image()
+      img.onload = () => {
+        const MAX_DIM = 1000
+        let { width, height } = img
+        if (width > MAX_DIM || height > MAX_DIM) {
+          const scale = MAX_DIM / Math.max(width, height)
+          width = Math.round(width * scale)
+          height = Math.round(height * scale)
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")
+        if (!ctx) return reject(new Error("Canvas not supported"))
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", 0.85))
+      }
+      img.onerror = () => reject(new Error("Could not read image — try a different photo (JPEG/PNG work best)"))
+      img.src = ev.target?.result as string
+    }
+    reader.onerror = () => reject(new Error("Could not read file"))
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function ProjectUpdateForm() {
   const [student, setStudent]   = useState<any>(null)
   const [updates, setUpdates]   = useState<any[]>([])
@@ -61,13 +92,16 @@ export default function ProjectUpdateForm() {
     }))
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-    if (file.size > 2000000) { showToast("Image must be under 2MB", "warning"); return }
-    const reader = new FileReader()
-    reader.onload = (ev) => setForm((f) => ({ ...f, image: ev.target?.result as string }))
-    reader.readAsDataURL(file)
+    if (file.size > 8000000) { showToast("Image must be under 8MB", "warning"); return }
+    try {
+      const jpegDataUrl = await normalizeImageToJpeg(file)
+      setForm((f) => ({ ...f, image: jpegDataUrl }))
+    } catch (err: any) {
+      showToast(err?.message || "Could not process image", "error")
+    }
   }
 
   const handleSubmit = async () => {

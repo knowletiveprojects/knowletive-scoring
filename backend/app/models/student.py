@@ -1,9 +1,7 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
 from datetime import datetime
-from app.models.interpersonal_skill import InterpersonalSkill
-
 
 
 class Student(Base):
@@ -15,9 +13,10 @@ class Student(Base):
     level     = Column(String, default="Beginner")
     photo     = Column(Text, nullable=True)
     joined_at = Column(DateTime, default=datetime.utcnow)
+    batch_id  = Column(Integer, ForeignKey("batches.id"), nullable=True)
 
     scores  = relationship("Score", back_populates="student")
     rewards = relationship("Reward", back_populates="student")
     attendance = relationship("Attendance", back_populates="student")
     interpersonal_skills = relationship("InterpersonalSkill", back_populates="student")
-    
+    batch = relationship("Batch", back_populates="students")

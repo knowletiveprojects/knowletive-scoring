@@ -9,6 +9,9 @@ from app.models.attendance import Attendance
 from app.models.interpersonal_skill import InterpersonalSkill
 from app.models.study_material import StudyMaterial
 from sqlalchemy import text
+from app.models.batch import Batch
+from app.routers import students, scores, attendance, interpersonal_skills, project_updates, study_material, batches
+
 
 
 
@@ -60,6 +63,7 @@ app.include_router(attendance.router)
 app.include_router(interpersonal_skills.router)
 app.include_router(project_updates.router)
 app.include_router(study_material.router)
+app.include_router(batches.router)
 
 
 @app.get("/")

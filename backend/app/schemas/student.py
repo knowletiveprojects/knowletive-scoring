@@ -32,5 +32,22 @@ class RewardResponse(BaseModel):
     title: str
     date: date
 
+class StudentCreate(BaseModel):
+    name: str
+    email: EmailStr
+    photo: Optional[str] = None
+    batch_id: int
+
+class StudentResponse(BaseModel):
+    id: int
+    name: str
+    email: str
+    level: str
+    photo: Optional[str] = None
+    joined_at: datetime
+    batch_id: Optional[int] = None
+
     class Config:
         from_attributes = True
+
+   

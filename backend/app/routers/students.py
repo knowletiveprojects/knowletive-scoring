@@ -8,6 +8,7 @@ from app.schemas.student import StudentCreate, StudentResponse, RewardCreate, Re
 from typing import List, Optional
 from datetime import date
 from pydantic import BaseModel
+from app.models.batch import Batch
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
@@ -23,6 +24,9 @@ def create_student(payload: StudentCreate, db: Session = Depends(get_db)):
     existing = db.query(Student).filter(Student.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+    batch = db.query(Batch).filter(Batch.id == payload.batch_id).first()
+    if not batch:
+        raise HTTPException(status_code=400, detail="Invalid batch_id")
     student = Student(**payload.dict())
     db.add(student)
     db.commit()
@@ -30,8 +34,18 @@ def create_student(payload: StudentCreate, db: Session = Depends(get_db)):
     return student
 
 @router.get("/", response_model=List[StudentResponse])
-def get_all_students(db: Session = Depends(get_db)):
-    return db.query(Student).all()
+def get_all_students(
+    batch_id: Optional[int] = None,
+    all_batches: bool = False,
+    db: Session = Depends(get_db)
+):
+    query = db.query(Student)
+    if all_batches:
+        return query.all()
+    if batch_id is not None:
+        return query.filter(Student.batch_id == batch_id).all()
+    active_ids = [b.id for b in db.query(Batch).filter(Batch.is_active == True).all()]
+    return query.filter(Student.batch_id.in_(active_ids)).all()
 
 @router.get("/{student_id}", response_model=StudentResponse)
 def get_student(student_id: int, db: Session = Depends(get_db)):
@@ -56,6 +70,7 @@ def update_photo(student_id: int, payload: PhotoUpdate, db: Session = Depends(ge
     db.commit()
     db.refresh(student)
     return student
+
 @router.put("/{student_id}", response_model=StudentResponse)
 def update_student(
     student_id: int,
