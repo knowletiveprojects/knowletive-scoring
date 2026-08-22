@@ -24,9 +24,12 @@ def create_student(payload: StudentCreate, db: Session = Depends(get_db)):
     existing = db.query(Student).filter(Student.email == payload.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
-    batch = db.query(Batch).filter(Batch.id == payload.batch_id).first()
-    if not batch:
-        raise HTTPException(status_code=400, detail="Invalid batch_id")
+
+    if payload.batch_id is not None:
+        batch = db.query(Batch).filter(Batch.id == payload.batch_id).first()
+        if not batch:
+            raise HTTPException(status_code=400, detail="Invalid batch_id")
+
     student = Student(**payload.dict())
     db.add(student)
     db.commit()
