@@ -1,9 +1,15 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 from database import get_db
 from app.models.student import Student
 from app.models.score import Score
 from app.models.reward import Reward
+from app.models.attendance import Attendance
+from app.models.interpersonal_skill import InterpersonalSkill
+# NOTE: confirm these class/module names match your actual files in app/models/
+from app.models.project_update import ProjectUpdate
+from app.models.study_material import StudyMaterial
 from app.schemas.student import StudentCreate, StudentResponse, RewardCreate, RewardResponse
 from typing import List, Optional
 from datetime import date
@@ -105,10 +111,25 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
     student = db.query(Student).filter(Student.id == student_id).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found")
-    db.query(Score).filter(Score.student_id == student_id).delete()
-    db.query(Reward).filter(Reward.student_id == student_id).delete()
-    db.delete(student)
-    db.commit()
+
+    try:
+        # Delete all related records first to satisfy FK constraints
+        db.query(Score).filter(Score.student_id == student_id).delete()
+        db.query(Reward).filter(Reward.student_id == student_id).delete()
+        db.query(Attendance).filter(Attendance.student_id == student_id).delete()
+        db.query(InterpersonalSkill).filter(InterpersonalSkill.student_id == student_id).delete()
+        db.query(ProjectUpdate).filter(ProjectUpdate.student_id == student_id).delete()
+        db.query(StudyMaterial).filter(StudyMaterial.student_id == student_id).delete()
+
+        db.delete(student)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete student: related records still exist. Please contact support."
+        )
+
     return {"message": "Student deleted"}
 
 # ── REWARDS ──
