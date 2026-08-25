@@ -21,8 +21,21 @@ def get_active_batches(db: Session = Depends(get_db)):
 
 @router.post("/", response_model=BatchResponse)
 def create_batch(payload: BatchCreate, db: Session = Depends(get_db)):
-    """Starting a new batch does NOT close any existing batch — they can run side by side."""
-    batch = Batch(name=payload.name, is_active=True)
+    """Starting a new batch does NOT close any existing batch — they can run side by side.
+    Prevents creating a duplicate: an active batch with the same name (case-insensitive)."""
+    existing = (
+        db.query(Batch)
+        .filter(Batch.is_active == True)
+        .filter(Batch.name.ilike(payload.name.strip()))
+        .first()
+    )
+    if existing:
+        raise HTTPException(
+            status_code=400,
+            detail=f"An active batch named '{payload.name}' already exists."
+        )
+
+    batch = Batch(name=payload.name.strip(), is_active=True)
     db.add(batch)
     db.commit()
     db.refresh(batch)

@@ -4,7 +4,7 @@ from database import get_db
 from app.models.attendance import Attendance
 from app.models.student import Student
 from app.schemas.attendance import AttendanceCreate, AttendanceResponse, BulkAttendanceCreate
-from typing import List
+from typing import List, Optional
 from datetime import date
 
 router = APIRouter(prefix="/attendance", tags=["Attendance"])
@@ -29,18 +29,23 @@ def calc_pct(records):
 
 
 @router.get("/", response_model=List[AttendanceResponse])
-def get_all_attendance(db: Session = Depends(get_db)):
-    return db.query(Attendance).all()
+def get_all_attendance(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
+    query = db.query(Attendance)
+    if batch_id is not None:
+        query = query.join(Student, Attendance.student_id == Student.id).filter(Student.batch_id == batch_id)
+    return query.all()
 
 
 @router.get("/date/{date}", response_model=List[dict])
-def get_attendance_by_date(date: date, db: Session = Depends(get_db)):
-    results = (
+def get_attendance_by_date(date: date, batch_id: Optional[int] = None, db: Session = Depends(get_db)):
+    query = (
         db.query(Attendance, Student.name)
         .join(Student, Attendance.student_id == Student.id)
         .filter(Attendance.date == date)
-        .all()
     )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    results = query.all()
     return [
         {
             "id": a.id,
@@ -64,8 +69,11 @@ def get_student_attendance(student_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/summary", response_model=List[dict])
-def get_attendance_summary(db: Session = Depends(get_db)):
-    students = db.query(Student).all()
+def get_attendance_summary(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
+    query = db.query(Student)
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    students = query.all()
     result = []
     for s in students:
         records = db.query(Attendance).filter(Attendance.student_id == s.id).all()

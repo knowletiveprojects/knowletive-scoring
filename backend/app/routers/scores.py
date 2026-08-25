@@ -5,7 +5,7 @@ from app.models.score import Score
 from app.models.student import Student
 from app.models.reward import Reward
 from app.schemas.score import ScoreCreate, ScoreResponse
-from typing import List
+from typing import List, Optional
 from datetime import date, timedelta
 from sqlalchemy import func, text
 
@@ -96,25 +96,25 @@ def submit_score(payload: ScoreCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/leaderboard/today", response_model=List[dict])
-def today_leaderboard(db: Session = Depends(get_db)):
+def today_leaderboard(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
     today = date.today()
-    results = (
+    query = (
         db.query(Student.name, Student.id.label("student_id"), Score.total)
         .join(Score, Score.student_id == Student.id)
         .filter(Score.date == today, Score.total > 0, Score.score_type == "daily")
-        .order_by(Score.total.desc())
-        .limit(20)
-        .all()
     )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    results = query.order_by(Score.total.desc()).limit(20).all()
     return [{"name": r.name, "student_id": r.student_id, "total": r.total, "rank": i + 1}
             for i, r in enumerate(results)]
 
 
 @router.get("/leaderboard/weekly", response_model=List[dict])
-def weekly_leaderboard(db: Session = Depends(get_db)):
+def weekly_leaderboard(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
     today = date.today()
     week_start = today - timedelta(days=today.weekday())
-    results = (
+    query = (
         db.query(
             Student.name,
             Student.id.label("student_id"),
@@ -127,7 +127,11 @@ def weekly_leaderboard(db: Session = Depends(get_db)):
             Score.total > 0,
             Score.score_type == "daily"  # ✅ sum all daily scores this week
         )
-        .group_by(Student.id, Student.name)
+    )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    results = (
+        query.group_by(Student.id, Student.name)
         .order_by(func.sum(Score.total).desc())
         .limit(20)
         .all()
@@ -137,10 +141,10 @@ def weekly_leaderboard(db: Session = Depends(get_db)):
 
 
 @router.get("/leaderboard/monthly", response_model=List[dict])
-def monthly_leaderboard(db: Session = Depends(get_db)):
+def monthly_leaderboard(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
     today = date.today()
     month_start = today.replace(day=1)
-    results = (
+    query = (
         db.query(
             Student.name,
             Student.id.label("student_id"),
@@ -153,7 +157,11 @@ def monthly_leaderboard(db: Session = Depends(get_db)):
             Score.total > 0,
             Score.score_type == "daily"  # ✅ sum all daily scores this month
         )
-        .group_by(Student.id, Student.name)
+    )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    results = (
+        query.group_by(Student.id, Student.name)
         .order_by(func.sum(Score.total).desc())
         .limit(20)
         .all()
@@ -163,15 +171,16 @@ def monthly_leaderboard(db: Session = Depends(get_db)):
 
 
 @router.get("/student-of-the-day")
-def student_of_the_day(db: Session = Depends(get_db)):
+def student_of_the_day(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
     today = date.today()
-    result = (
+    query = (
         db.query(Student.name, Score.total)
         .join(Score, Score.student_id == Student.id)
         .filter(Score.date == today, Score.score_type == "daily")
-        .order_by(Score.total.desc())
-        .first()
     )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    result = query.order_by(Score.total.desc()).first()
     if not result:
         raise HTTPException(status_code=404, detail="No scores today")
     return {"student_of_the_day": result.name, "score": result.total}
@@ -259,24 +268,29 @@ def student_average(student_id: int, days: int = 7, db: Session = Depends(get_db
 
 
 @router.get("/averages/all")
-def all_students_average(days: int = 7, db: Session = Depends(get_db)):
+def all_students_average(days: int = 7, batch_id: Optional[int] = None, db: Session = Depends(get_db)):
     end = date.today()
     start = end - timedelta(days=days - 1)
 
+    query = db.query(
+        Student.id, Student.name, Student.email, Student.level,
+        func.count(Score.id).label("sessions"),
+        func.avg(Score.total).label("avg_total"),
+        func.avg(Score.attendance).label("avg_attendance"),
+        func.avg(Score.speak_up).label("avg_speak_up"),
+        func.avg(Score.activity).label("avg_activity"),
+        func.avg(Score.technical).label("avg_technical"),
+        func.avg(Score.behavior).label("avg_behavior"),
+        func.avg(Score.initiative).label("avg_initiative"),
+    ).outerjoin(
+        Score,
+        (Score.student_id == Student.id) & (Score.date >= start) & (Score.date <= end) & (Score.total > 0)
+    )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+
     results = (
-        db.query(
-            Student.id, Student.name, Student.email, Student.level,
-            func.count(Score.id).label("sessions"),
-            func.avg(Score.total).label("avg_total"),
-            func.avg(Score.attendance).label("avg_attendance"),
-            func.avg(Score.speak_up).label("avg_speak_up"),
-            func.avg(Score.activity).label("avg_activity"),
-            func.avg(Score.technical).label("avg_technical"),
-            func.avg(Score.behavior).label("avg_behavior"),
-            func.avg(Score.initiative).label("avg_initiative"),
-        )
-        .outerjoin(Score, (Score.student_id == Student.id) & (Score.date >= start) & (Score.date <= end) & (Score.total > 0))
-        .group_by(Student.id, Student.name, Student.email, Student.level)
+        query.group_by(Student.id, Student.name, Student.email, Student.level)
         .order_by(func.avg(Score.total).desc().nulls_last())
         .all()
     )
@@ -315,8 +329,11 @@ def get_streak(student_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/streaks/all")
-def get_all_streaks(db: Session = Depends(get_db)):
-    students = db.query(Student).all()
+def get_all_streaks(batch_id: Optional[int] = None, db: Session = Depends(get_db)):
+    query = db.query(Student)
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+    students = query.all()
     result = []
 
     for student in students:
