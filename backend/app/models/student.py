@@ -19,9 +19,4 @@ class Student(Base):
     rewards = relationship("Reward", back_populates="student")
     attendance = relationship("Attendance", back_populates="student")
     interpersonal_skills = relationship("InterpersonalSkill", back_populates="student")
-    # NOTE: only keep these two if ProjectUpdate / StudyMaterial models actually
-    # define a back_populates="student" relationship back to Student — otherwise
-    # remove these two lines (they'll error at import time if the other side is missing).
-    project_updates = relationship("ProjectUpdate", back_populates="student")
-    study_materials = relationship("StudyMaterial", back_populates="student")
     batch = relationship("Batch", back_populates="students")
