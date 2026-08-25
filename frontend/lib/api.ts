@@ -28,6 +28,7 @@ export const getWeeklyLeaderboard = () => API.get("/scores/leaderboard/weekly")
 export const getMonthlyLeaderboard = () => API.get("/scores/leaderboard/monthly")
 export const getStudentOfDay = () => API.get("/scores/student-of-the-day")
 
+
 // Batches
 export const getBatches = () => API.get("/batches/")
 export const getActiveBatches = () => API.get("/batches/active")
