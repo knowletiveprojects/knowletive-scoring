@@ -2,7 +2,10 @@
 import { useState, useEffect } from "react"
 import { getStudents } from "@/lib/api"
 
+type Student = { id: number; name: string }
+
 type ActivityStatus = "Y" | "N" | ""
+// ActivityMap: date -> activityName -> studentId (as string) -> status
 type ActivityMap = Record<string, Record<string, Record<string, ActivityStatus>>>
 
 const TOTAL_DAYS = 90
@@ -26,7 +29,7 @@ const avatarColors = [
 ]
 
 export default function DailyActivity() {
-  const [students, setStudents] = useState<string[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const [activities, setActivities] = useState<ActivityMap>({})
   const [actDate, setActDate] = useState(today())
   const [actName, setActName] = useState("")
@@ -37,7 +40,7 @@ export default function DailyActivity() {
   // Load students from backend API
   useEffect(() => {
     getStudents()
-      .then(res => setStudents(res.data.map((s: any) => s.name)))
+      .then(res => setStudents(res.data.map((s: any) => ({ id: s.id, name: s.name }))))
       .catch(() => setStudents([]))
       .finally(() => setLoading(false))
   }, [])
@@ -90,9 +93,10 @@ export default function DailyActivity() {
     persistActivities(updAc)
   }
 
-  const cycleStatus = (student: string) => {
+  const cycleStatus = (studentId: number) => {
     if (!actName) return
-    const current = (activities[actDate]?.[actName]?.[student] || "") as ActivityStatus
+    const key = String(studentId)
+    const current = (activities[actDate]?.[actName]?.[key] || "") as ActivityStatus
     const next = CYCLE[(CYCLE.indexOf(current) + 1) % CYCLE.length]
     const updAc: ActivityMap = {
       ...activities,
@@ -100,7 +104,7 @@ export default function DailyActivity() {
         ...(activities[actDate] || {}),
         [actName]: {
           ...(activities[actDate]?.[actName] || {}),
-          [student]: next,
+          [key]: next,
         },
       },
     }
@@ -114,7 +118,7 @@ export default function DailyActivity() {
       ...activities,
       [actDate]: {
         ...(activities[actDate] || {}),
-        [actName]: Object.fromEntries(students.map(n => [n, status])),
+        [actName]: Object.fromEntries(students.map(s => [String(s.id), status])),
       },
     }
     setActivities(updAc)
@@ -172,14 +176,14 @@ export default function DailyActivity() {
           <div style={{ fontSize: 13, color: "#94a3b8" }}>No students found. Add them in the Students tab first.</div>
         ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {students.map((name, i) => {
+            {students.map((student, i) => {
               const [g1,g2] = avatarColors[i % avatarColors.length]
               return (
-                <div key={name} style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 10px", borderRadius: 20, border: "1px solid #e5e9f5", background: "#fafbff", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
+                <div key={student.id} style={{ display: "flex", alignItems: "center", gap: 7, padding: "5px 10px", borderRadius: 20, border: "1px solid #e5e9f5", background: "#fafbff", fontSize: 13, fontWeight: 600, color: "#0f172a" }}>
                   <div style={{ width: 22, height: 22, borderRadius: 6, background: `linear-gradient(135deg,${g1},${g2})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>
-                    {name.charAt(0).toUpperCase()}
+                    {student.name.charAt(0).toUpperCase()}
                   </div>
-                  {name}
+                  {student.name}
                 </div>
               )
             })}
@@ -286,26 +290,26 @@ export default function DailyActivity() {
                     </tr>
                   </thead>
                   <tbody>
-                    {students.map((name, i) => {
-                      const s = (activities[actDate]?.[actName]?.[name] || "") as ActivityStatus
+                    {students.map((student, i) => {
+                      const s = (activities[actDate]?.[actName]?.[String(student.id)] || "") as ActivityStatus
                       const st = actStyle(s)
                       const [g1,g2] = avatarColors[i % avatarColors.length]
                       return (
-                        <tr key={name} style={{ borderBottom: "1px solid #f1f5f9" }}
+                        <tr key={student.id} style={{ borderBottom: "1px solid #f1f5f9" }}
                           onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = "#fafbff"}
                           onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = "transparent"}>
                           <td style={{ padding: "12px 20px" }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                               <div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg,${g1},${g2})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 800, color: "#fff" }}>
-                                {name.charAt(0).toUpperCase()}
+                                {student.name.charAt(0).toUpperCase()}
                               </div>
-                              <span style={{ fontWeight: 600, color: "#0f172a" }}>{name}</span>
+                              <span style={{ fontWeight: 600, color: "#0f172a" }}>{student.name}</span>
                             </div>
                           </td>
                           <td style={{ padding: "12px 20px", textAlign: "center", color: "#64748b", fontWeight: 500 }}>{actName}</td>
                           <td style={{ padding: "12px 20px", textAlign: "center", color: "#94a3b8", fontSize: 12 }}>{fmtDate(actDate)}</td>
                           <td style={{ padding: "12px 20px", textAlign: "center" }}>
-                            <div onClick={() => cycleStatus(name)}
+                            <div onClick={() => cycleStatus(student.id)}
                               style={{ width: 40, height: 40, borderRadius: 10, background: st.bg, border: `2px solid ${st.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 800, color: st.color, cursor: "pointer", margin: "0 auto", transition: "all 0.15s", userSelect: "none" as const }}>
                               {s || "—"}
                             </div>
@@ -319,9 +323,9 @@ export default function DailyActivity() {
                       <td style={{ padding: "12px 20px", fontWeight: 700, fontSize: 13, color: "#475569" }}>TOTAL</td>
                       <td colSpan={2} />
                       <td style={{ padding: "12px 20px", textAlign: "center" }}>
-                        <span style={{ color: "#059669", fontWeight: 700, fontSize: 14 }}>Y: {students.filter(n => activities[actDate]?.[actName]?.[n] === "Y").length}</span>
+                        <span style={{ color: "#059669", fontWeight: 700, fontSize: 14 }}>Y: {students.filter(st => activities[actDate]?.[actName]?.[String(st.id)] === "Y").length}</span>
                         <span style={{ color: "#94a3b8", margin: "0 8px" }}>·</span>
-                        <span style={{ color: "#dc2626", fontWeight: 700, fontSize: 14 }}>N: {students.filter(n => activities[actDate]?.[actName]?.[n] === "N").length}</span>
+                        <span style={{ color: "#dc2626", fontWeight: 700, fontSize: 14 }}>N: {students.filter(st => activities[actDate]?.[actName]?.[String(st.id)] === "N").length}</span>
                       </td>
                     </tr>
                   </tfoot>
@@ -358,11 +362,12 @@ export default function DailyActivity() {
                       </tr>
                     </thead>
                     <tbody>
-                      {students.map((name, i) => {
+                      {students.map((student, i) => {
                         let Y = 0, N = 0
+                        const key = String(student.id)
                         allDates.forEach(d => {
                           Object.keys(activities[d] || {}).forEach(a => {
-                            const s = activities[d][a][name]
+                            const s = activities[d][a][key]
                             if (s === "Y") Y++
                             if (s === "N") N++
                           })
@@ -371,11 +376,11 @@ export default function DailyActivity() {
                         const pctColor = pct >= 90 ? "#059669" : pct >= 75 ? "#2563eb" : pct >= 50 ? "#d97706" : "#dc2626"
                         const [g1,g2] = avatarColors[i % avatarColors.length]
                         return (
-                          <tr key={name} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                          <tr key={student.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
                             <td style={{ padding: "10px 20px" }}>
                               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg,${g1},${g2})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>{name.charAt(0).toUpperCase()}</div>
-                                <span style={{ fontWeight: 600, color: "#0f172a" }}>{name}</span>
+                                <div style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg,${g1},${g2})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 800, color: "#fff" }}>{student.name.charAt(0).toUpperCase()}</div>
+                                <span style={{ fontWeight: 600, color: "#0f172a" }}>{student.name}</span>
                               </div>
                             </td>
                             <td style={{ padding: "10px 20px", textAlign: "center", fontWeight: 700, color: "#059669", fontSize: 14 }}>{Y}</td>
@@ -399,8 +404,8 @@ export default function DailyActivity() {
                     <span style={{ fontSize: 12, color: "#94a3b8" }}>{Object.keys(activities[d] || {}).length} activit{Object.keys(activities[d] || {}).length === 1 ? "y" : "ies"}</span>
                   </div>
                   {Object.keys(activities[d] || {}).map(aName => {
-                    const Y = students.filter(n => activities[d]?.[aName]?.[n] === "Y").length
-                    const N = students.filter(n => activities[d]?.[aName]?.[n] === "N").length
+                    const Y = students.filter(st => activities[d]?.[aName]?.[String(st.id)] === "Y").length
+                    const N = students.filter(st => activities[d]?.[aName]?.[String(st.id)] === "N").length
                     return (
                       <div key={aName} onClick={() => { setActDate(d); setActName(aName); setView("entry") }}
                         style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 20px", borderBottom: "1px solid #f8f9fe", cursor: "pointer", transition: "background 0.15s" }}
