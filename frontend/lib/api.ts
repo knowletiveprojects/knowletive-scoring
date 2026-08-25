@@ -5,7 +5,8 @@ const API = axios.create({
 })
 
 // Students
-export const getStudents = () => API.get("/students/")
+export const getStudents = (batchId?: number) =>
+  API.get("/students/", { params: batchId ? { batch_id: batchId } : {} })
 export const createStudent = (data: { name: string; email: string; photo?: string; batch_id: number }) =>
   API.post("/students/", data)
 export const deleteStudent = (id: number) => API.delete(`/students/${id}`)
@@ -23,10 +24,14 @@ export const updateStudent = (
 
 // Scores
 export const submitScore = (data: any) => API.post("/scores/", data)
-export const getLeaderboard = () => API.get("/scores/leaderboard/today")
-export const getWeeklyLeaderboard = () => API.get("/scores/leaderboard/weekly")
-export const getMonthlyLeaderboard = () => API.get("/scores/leaderboard/monthly")
-export const getStudentOfDay = () => API.get("/scores/student-of-the-day")
+export const getLeaderboard = (batchId?: number) =>
+  API.get("/scores/leaderboard/today", { params: batchId ? { batch_id: batchId } : {} })
+export const getWeeklyLeaderboard = (batchId?: number) =>
+  API.get("/scores/leaderboard/weekly", { params: batchId ? { batch_id: batchId } : {} })
+export const getMonthlyLeaderboard = (batchId?: number) =>
+  API.get("/scores/leaderboard/monthly", { params: batchId ? { batch_id: batchId } : {} })
+export const getStudentOfDay = (batchId?: number) =>
+  API.get("/scores/student-of-the-day", { params: batchId ? { batch_id: batchId } : {} })
 
 
 // Batches
@@ -55,14 +60,14 @@ export const getStudentRewards = (studentId: number) =>
 export const getAllRewards = () => API.get("/students/rewards/all")
 
 // Averages & Streaks
-export const getAllAverages = (days: number) =>
-  API.get(`/scores/averages/all?days=${days}`)
+export const getAllAverages = (days: number, batchId?: number) =>
+  API.get("/scores/averages/all", { params: batchId ? { days, batch_id: batchId } : { days } })
 export const getStudentAverage = (studentId: number, days: number) =>
   API.get(`/scores/average/${studentId}?days=${days}`)
 export const getStudentStreak = (studentId: number) =>
   API.get(`/scores/streak/${studentId}`)
-export const getAllStreaks = () =>
-  API.get(`/scores/streaks/all`)
+export const getAllStreaks = (batchId?: number) =>
+  API.get("/scores/streaks/all", { params: batchId ? { batch_id: batchId } : {} })
 
 // Google Sheet attendance fetch
 export const fetchAttendanceFromSheet = async (sheetId: string) => {
@@ -98,6 +103,14 @@ export const parseAttendanceCSV = (csv: string) => {
 
   return { headers: headers.slice(1), students }
 }
+
+// Attendance
+export const getAllAttendance = (batchId?: number) =>
+  API.get("/attendance/", { params: batchId ? { batch_id: batchId } : {} })
+export const getAttendanceByDate = (date: string, batchId?: number) =>
+  API.get(`/attendance/date/${date}`, { params: batchId ? { batch_id: batchId } : {} })
+export const getAttendanceSummary = (batchId?: number) =>
+  API.get("/attendance/summary", { params: batchId ? { batch_id: batchId } : {} })
 
 // Daily Activity
 export const createActivity = (data: { date: string; name: string }) =>
