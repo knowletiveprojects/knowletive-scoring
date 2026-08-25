@@ -9,7 +9,6 @@ import DailyActivity from "@/components/Dailyactivity"
 import InterpersonalSkills from "@/components/InterpersonalSkills"
 import ProjectUpdates from "@/components/ProjectUpdates"
 import ScoreEntryFullRange from "@/components/ScoreForm"
-import { updateStudent } from "@/lib/api"
 
 import {
   getStudents, createStudent, deleteStudent,
@@ -17,7 +16,7 @@ import {
   giveReward, getAllRewards,
   getWeeklyLeaderboard, getMonthlyLeaderboard,
   getAllAverages, getAllStreaks,
-  updateStudentPhoto,
+  updateStudentPhoto, updateStudent, getActiveBatches,
 } from "@/lib/api"
 
 type Period = "daily" | "weekly" | "monthly"
@@ -218,6 +217,8 @@ export default function FacultyPage() {
   const [newPhoto, setNewPhoto] = useState("")
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editingName, setEditingName] = useState("")
+  const [activeBatches, setActiveBatches] = useState<any[]>([])
+  const [selectedBatchId, setSelectedBatchId] = useState<string>("")
 
   // ── Score forms — loaded from localStorage drafts ──
   const [dailyForm,   setDailyFormRaw]   = useState(() => loadFormDraft("daily"))
@@ -246,6 +247,7 @@ export default function FacultyPage() {
     fetchLeaderboard("daily", "score")
     fetchAnalytics(7)
     fetchStreaks()
+    fetchBatches()
   }, [])
 
   const fetchBase = async () => {
@@ -254,6 +256,14 @@ export default function FacultyPage() {
       setStudents(s.data); setRewards(r.data)
     } catch {}
     try { const sod = await getStudentOfDay(); setStudentOfDay(sod.data) } catch {}
+  }
+
+  const fetchBatches = async () => {
+    try {
+      const res = await getActiveBatches()
+      setActiveBatches(res.data)
+      if (res.data.length === 1) setSelectedBatchId(String(res.data[0].id))
+    } catch {}
   }
 
   const fetchLeaderboard = async (period: Period, context: "dash" | "score") => {
@@ -307,8 +317,9 @@ export default function FacultyPage() {
 
   const handleAddStudent = async () => {
     if (!newName || !newEmail) return showToast("Please fill in all fields!", "warning")
+    if (!selectedBatchId) return showToast("No active batch found — create one first!", "warning")
     try {
-      await createStudent({ name: newName, email: newEmail, photo: newPhoto || undefined })
+      await createStudent({ name: newName, email: newEmail, photo: newPhoto || undefined, batch_id: Number(selectedBatchId) })
       setNewName(""); setNewEmail(""); setNewPhoto("")
       const photoInput = document.getElementById("photo-upload") as HTMLInputElement
       if (photoInput) photoInput.value = ""
@@ -432,7 +443,6 @@ export default function FacultyPage() {
   ]
 
   const classAvg = analytics.filter(a => a.sessions > 0).length > 0
-
     ? Math.round(analytics.filter(a => a.sessions > 0).reduce((acc,a) => acc + a.avg_total, 0) / analytics.filter(a => a.sessions > 0).length)
     : 0
 
@@ -677,7 +687,6 @@ export default function FacultyPage() {
           )}
 
           {/* ══ SCORE ENTRY ══ */}
-          {/* ══ SCORE ENTRY ══ */}
           {tab === "score" && (
             <div style={{ maxWidth:"100%", paddingRight:0 }}>
               <ScoreEntryFullRange
@@ -708,7 +717,6 @@ export default function FacultyPage() {
               <div className="card fu fu1" style={{ marginBottom:24 }}>
                 <div className="sec-label">➕ Add New Student</div>
                 <div style={{ display:"flex", gap:12, flexWrap:"wrap" as const, alignItems:"flex-end" }}>
-
                   {/* Photo upload for new student */}
                   <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:8 }}>
                     <div style={{ width:60, height:60, borderRadius:14, overflow:"hidden", border:"2px dashed var(--border)", background:"#f8f9fe", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", position:"relative" as const }}
@@ -731,11 +739,17 @@ export default function FacultyPage() {
                     />
                     <span style={{ fontSize:10, color:"var(--faint)", textAlign:"center" }}>Photo<br/>(optional)</span>
                   </div>
-
                   <input className="f-input" placeholder="Full name" value={newName}
                     onChange={e => setNewName(e.target.value)} style={{ flex:1, minWidth:150 }} />
                   <input className="f-input" placeholder="Email address" value={newEmail}
                     onChange={e => setNewEmail(e.target.value)} style={{ flex:1, minWidth:150 }} />
+                  {activeBatches.length > 1 && (
+                    <select className="f-input" style={{ minWidth: 160 }} value={selectedBatchId} onChange={e => setSelectedBatchId(e.target.value)}>
+                      {activeBatches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  )}
                   <button className="btn-add" onClick={handleAddStudent}>+ Add Student</button>
                 </div>
               </div>
