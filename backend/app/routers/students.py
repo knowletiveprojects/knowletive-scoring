@@ -7,9 +7,7 @@ from app.models.score import Score
 from app.models.reward import Reward
 from app.models.attendance import Attendance
 from app.models.interpersonal_skill import InterpersonalSkill
-# NOTE: confirm these class/module names match your actual files in app/models/
 from app.models.project_update import ProjectUpdate
-from app.models.study_material import StudyMaterial
 from app.schemas.student import StudentCreate, StudentResponse, RewardCreate, RewardResponse
 from typing import List, Optional
 from datetime import date
@@ -113,13 +111,15 @@ def delete_student(student_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Student not found")
 
     try:
-        # Delete all related records first to satisfy FK constraints
+        # Delete all related records first to satisfy FK constraints.
+        # NOTE: StudyMaterial does NOT have a student_id column (confirmed via
+        # production error) — do not add it back here without first checking
+        # app/models/study_material.py to find its actual schema/FK.
         db.query(Score).filter(Score.student_id == student_id).delete()
         db.query(Reward).filter(Reward.student_id == student_id).delete()
         db.query(Attendance).filter(Attendance.student_id == student_id).delete()
         db.query(InterpersonalSkill).filter(InterpersonalSkill.student_id == student_id).delete()
         db.query(ProjectUpdate).filter(ProjectUpdate.student_id == student_id).delete()
-        db.query(StudyMaterial).filter(StudyMaterial.student_id == student_id).delete()
 
         db.delete(student)
         db.commit()
