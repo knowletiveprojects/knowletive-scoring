@@ -242,36 +242,59 @@ export default function FacultyPage() {
 
   useEffect(() => {
     if (!localStorage.getItem("faculty_auth")) { router.push("/login"); return }
-    fetchBase()
-    fetchLeaderboard("daily", "dash")
-    fetchLeaderboard("daily", "score")
-    fetchAnalytics(7)
-    fetchStreaks()
     fetchBatches()
   }, [])
 
+  // Re-fetch everything whenever the selected batch changes
+  useEffect(() => {
+    if (!selectedBatchId) return
+    fetchBase()
+    fetchAnalytics(analyticsDays)
+    fetchLeaderboard(dashPeriod, "dash")
+    fetchLeaderboard(scorePeriod, "score")
+    fetchStreaks()
+  }, [selectedBatchId])
+
   const fetchBase = async () => {
     try {
-      const [s, r] = await Promise.all([getStudents(), getAllRewards()])
+      const [s, r] = await Promise.all([
+        getStudents(selectedBatchId ? Number(selectedBatchId) : undefined),
+        getAllRewards(),
+      ])
       setStudents(s.data); setRewards(r.data)
     } catch {}
-    try { const sod = await getStudentOfDay(); setStudentOfDay(sod.data) } catch {}
+    try {
+      const sod = await getStudentOfDay(selectedBatchId ? Number(selectedBatchId) : undefined)
+      setStudentOfDay(sod.data)
+    } catch { setStudentOfDay(null) }
   }
 
   const fetchBatches = async () => {
     try {
       const res = await getActiveBatches()
       setActiveBatches(res.data)
-      if (res.data.length === 1) setSelectedBatchId(String(res.data[0].id))
+      const saved = localStorage.getItem("faculty_batch_id")
+      const validSaved = res.data.find((b: any) => String(b.id) === saved)
+      if (validSaved) {
+        setSelectedBatchId(String(validSaved.id))
+      } else if (res.data.length > 0) {
+        setSelectedBatchId(String(res.data[0].id))
+      }
     } catch {}
+  }
+
+  const handleBatchChange = (id: string) => {
+    setSelectedBatchId(id)
+    localStorage.setItem("faculty_batch_id", id)
   }
 
   const fetchLeaderboard = async (period: Period, context: "dash" | "score") => {
     try {
+      const bid = selectedBatchId ? Number(selectedBatchId) : undefined
       let res
-      if (period === "daily")       res = await getLeaderboard()
-      else if (period === "weekly") res = await getWeeklyLeaderboard()
-      else                          res = await getMonthlyLeaderboard()
+      if (period === "daily")       res = await getLeaderboard(bid)
+      else if (period === "weekly") res = await getWeeklyLeaderboard(bid)
+      else                          res = await getMonthlyLeaderboard(bid)
       if (context === "dash") setDashLeaderboard(res.data)
       else                    setScoreLeaderboard(res.data)
     } catch {
@@ -282,13 +305,16 @@ export default function FacultyPage() {
 
   const fetchAnalytics = async (days: number) => {
     setAnalyticsLoading(true)
-    try { const res = await getAllAverages(days); setAnalytics(res.data) } catch {}
+    try {
+      const res = await getAllAverages(days, selectedBatchId ? Number(selectedBatchId) : undefined)
+      setAnalytics(res.data)
+    } catch {}
     setAnalyticsLoading(false)
   }
 
   const fetchStreaks = async () => {
     try {
-      const res = await getAllStreaks()
+      const res = await getAllStreaks(selectedBatchId ? Number(selectedBatchId) : undefined)
       const map: Record<number, number> = {}
       res.data.forEach((s: any) => { map[s.student_id] = s.streak })
       setStreaks(map)
@@ -577,6 +603,24 @@ export default function FacultyPage() {
             <img src="/logo.png" alt="Knowletive" className="brand-logo" />
             <div className="brand-tag">Faculty Portal</div>
           </div>
+
+          {/* ── BATCH SWITCHER ── */}
+          <div style={{ padding:"14px 20px", borderBottom:"1px solid var(--border)", background:"#fafbff" }}>
+            <div style={{ fontSize:10, letterSpacing:"1.5px", textTransform:"uppercase", color:"var(--faint)", fontWeight:700, marginBottom:6 }}>
+              📁 Active Batch
+            </div>
+            <select
+              className="f-input"
+              style={{ fontWeight:700, cursor:"pointer" }}
+              value={selectedBatchId}
+              onChange={e => handleBatchChange(e.target.value)}
+            >
+              {activeBatches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+
           <nav className="nav-area">
             <div className="nav-label">Navigation</div>
             {navTabs.map(t => (
@@ -611,6 +655,21 @@ export default function FacultyPage() {
         {sidebarOpen && (
           <div style={{ position:"fixed", inset:0, zIndex:100, background:"rgba(0,0,0,0.4)", display:"flex" }} onClick={() => setSidebarOpen(false)}>
             <div style={{ width:264, background:"#fff", height:"100%", padding:"80px 12px 24px", boxShadow:"4px 0 24px rgba(0,0,0,0.12)" }} onClick={e => e.stopPropagation()}>
+              <div style={{ padding:"0 8px 16px" }}>
+                <div style={{ fontSize:10, letterSpacing:"1.5px", textTransform:"uppercase", color:"var(--faint)", fontWeight:700, marginBottom:6 }}>
+                  📁 Active Batch
+                </div>
+                <select
+                  className="f-input"
+                  style={{ fontWeight:700, cursor:"pointer" }}
+                  value={selectedBatchId}
+                  onChange={e => handleBatchChange(e.target.value)}
+                >
+                  {activeBatches.map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
               {navTabs.map(t => (
                 <button key={t.id} onClick={() => { handleTabChange(t.id); setSidebarOpen(false) }} className={`nav-item ${tab === t.id ? "active" : ""}`} style={{ marginBottom:3 }}>
                   <span className="nav-emoji">{t.icon}</span>{t.label}
@@ -691,7 +750,7 @@ export default function FacultyPage() {
             <div style={{ maxWidth:"100%", paddingRight:0 }}>
               <ScoreEntryFullRange
                 students={students}
-                batchName="BCA 1st Year - A"
+                batchName={activeBatches.find(b => String(b.id) === selectedBatchId)?.name || ""}
                 onSaveAll={async (entries) => {
                   for (const e of entries) {
                     await submitScore(e)
@@ -743,15 +802,13 @@ export default function FacultyPage() {
                     onChange={e => setNewName(e.target.value)} style={{ flex:1, minWidth:150 }} />
                   <input className="f-input" placeholder="Email address" value={newEmail}
                     onChange={e => setNewEmail(e.target.value)} style={{ flex:1, minWidth:150 }} />
-                  {activeBatches.length > 1 && (
-                    <select className="f-input" style={{ minWidth: 160 }} value={selectedBatchId} onChange={e => setSelectedBatchId(e.target.value)}>
-                      {activeBatches.map(b => (
-                        <option key={b.id} value={b.id}>{b.name}</option>
-                      ))}
-                    </select>
-                  )}
                   <button className="btn-add" onClick={handleAddStudent}>+ Add Student</button>
                 </div>
+                {selectedBatchId && (
+                  <div style={{ marginTop:10, fontSize:12, color:"var(--muted)" }}>
+                    New students will be added to: <strong>{activeBatches.find(b => String(b.id) === selectedBatchId)?.name}</strong>
+                  </div>
+                )}
               </div>
 
               {/* Student Cards */}
