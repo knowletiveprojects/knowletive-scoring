@@ -19,7 +19,7 @@ export default function LoginPage() {
     if (!facultyUser || !facultyPass) return setError("Please fill in all fields.")
     if (facultyUser === "admin" && facultyPass === "admin123") {
       localStorage.setItem("faculty_auth", "true")
-      router.push("/faculty")
+      router.replace("/faculty")
     } else {
       setError("Invalid username or password.")
     }
@@ -34,7 +34,7 @@ export default function LoginPage() {
     try {
       const res = await studentLogin(studentEmail)
       localStorage.setItem("student", JSON.stringify(res.data))
-      router.push("/student")
+      router.replace("/student")
     } catch {
       setError("No student found with this email.")
     }
