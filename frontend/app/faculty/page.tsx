@@ -9,6 +9,8 @@ import DailyActivity from "@/components/Dailyactivity"
 import InterpersonalSkills from "@/components/InterpersonalSkills"
 import ProjectUpdates from "@/components/ProjectUpdates"
 import ScoreEntryFullRange from "@/components/ScoreForm"
+export const dynamic = "force-dynamic"
+
 
 import {
   getStudents, createStudent, deleteStudent,
