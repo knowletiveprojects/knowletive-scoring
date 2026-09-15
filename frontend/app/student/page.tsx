@@ -41,7 +41,7 @@ export default function StudentPage() {
 
   useEffect(() => {
     const s = localStorage.getItem("student")
-    if (!s) { router.push("/login"); return }
+    if (!s) { router.replace("/login"); return }
     const parsed = JSON.parse(s)
     setStudent(parsed)
 
@@ -189,7 +189,7 @@ export default function StudentPage() {
                   <div style={{ fontSize:11, color:"#94a3b8" }}>Student Portal</div>
                 </div>
               </div>
-              <button onClick={() => { localStorage.removeItem("student"); router.push("/login") }}
+              <button onClick={() => { localStorage.removeItem("student"); router.replace("/login") }}
                 style={{ padding:"8px 16px", borderRadius:10, border:"1.5px solid #e2e8f0", background:"#fff", color:"#475569", cursor:"pointer", fontWeight:600, fontSize:13, fontFamily:"'Plus Jakarta Sans',sans-serif" }}>
                 Sign Out
               </button>
