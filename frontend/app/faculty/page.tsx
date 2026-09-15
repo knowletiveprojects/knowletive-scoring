@@ -2,7 +2,7 @@
 import Toast from "@/components/Toast"
 import { useToast } from "@/lib/useToast"
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import AttendanceTracker from "@/components/AttendanceTracker"
 import StudyMaterial from "@/components/StudyMaterial"
 import DailyActivity from "@/components/Dailyactivity"
@@ -187,9 +187,6 @@ function LeaderboardList({ data, period, streaks = {} }: { data: any[]; period: 
 export default function FacultyPage() {
   const router = useRouter()
   const { toasts, showToast, removeToast } = useToast()
-
-  import { useRouter, useSearchParams } from "next/navigation"
-  // (useRouter is already imported — just add useSearchParams)
 
   const searchParams = useSearchParams()
   const [tab, setTab] = useState(searchParams.get("tab") || "dashboard")
