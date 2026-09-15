@@ -188,15 +188,21 @@ export default function FacultyPage() {
   const router = useRouter()
   const { toasts, showToast, removeToast } = useToast()
 
-  // ── Tab persisted to localStorage ──
-  const [tab, setTab] = useState("dashboard")
+  import { useRouter, useSearchParams } from "next/navigation"
+  // (useRouter is already imported — just add useSearchParams)
+
+  const searchParams = useSearchParams()
+  const [tab, setTab] = useState(searchParams.get("tab") || "dashboard")
+
   useEffect(() => {
-    const saved = localStorage.getItem("faculty_tab")
-    if (saved) setTab(saved)
-  }, [])
+    const urlTab = searchParams.get("tab")
+    if (urlTab) setTab(urlTab)
+  }, [searchParams])
+
   const handleTabChange = (tabId: string) => {
     setTab(tabId)
     localStorage.setItem("faculty_tab", tabId)
+    router.push(`/faculty?tab=${tabId}`)   // pushes a real history entry
   }
 
   const [students, setStudents] = useState<any[]>([])
