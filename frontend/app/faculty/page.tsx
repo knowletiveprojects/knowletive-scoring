@@ -1,7 +1,7 @@
 "use client"
 import Toast from "@/components/Toast"
 import { useToast } from "@/lib/useToast"
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import AttendanceTracker from "@/components/AttendanceTracker"
 import StudyMaterial from "@/components/StudyMaterial"
@@ -186,7 +186,7 @@ function LeaderboardList({ data, period, streaks = {} }: { data: any[]; period: 
   )
 }
 
-export default function FacultyPage() {
+function FacultyPageContent() {
   const router = useRouter()
   const { toasts, showToast, removeToast } = useToast()
 
@@ -1221,5 +1221,12 @@ export default function FacultyPage() {
         </main>
       </div>
     </>
+  )
+}
+export default function FacultyPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>Loading...</div>}>
+      <FacultyPageContent />
+    </Suspense>
   )
 }
