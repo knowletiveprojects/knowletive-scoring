@@ -241,7 +241,7 @@ export default function FacultyPage() {
   const [customDays, setCustomDays] = useState("")
 
   useEffect(() => {
-    if (!localStorage.getItem("faculty_auth")) { router.push("/login"); return }
+    if (!localStorage.getItem("faculty_auth")) { router.replace("/login"); return }
     fetchBatches()
   }, [])
 
@@ -639,7 +639,7 @@ export default function FacultyPage() {
                 <div className="faculty-role">Instructor</div>
               </div>
             </div>
-            <button className="logout-btn" onClick={() => { localStorage.removeItem("faculty_auth"); localStorage.removeItem("faculty_tab"); router.push("/login") }}>
+            <button className="logout-btn" onClick={() => { localStorage.removeItem("faculty_auth"); localStorage.removeItem("faculty_tab"); router.replace("/login") }}>
               🚪 Sign out
             </button>
           </div>
