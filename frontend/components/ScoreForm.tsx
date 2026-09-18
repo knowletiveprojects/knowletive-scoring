@@ -4,13 +4,22 @@ import { useState, useEffect, useRef } from "react"
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
 const METRICS = [
-  { key: "attendance", label: "Attendance", max: 10,  icon: "🟢", color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7", steps: [0,1,2,3,4,5,6,7,8,9,10] },
-  { key: "speak_up",   label: "Speak Up",   max: 15,  icon: "🎤", color: "#8b5cf6", bg: "#f5f3ff", border: "#c4b5fd", steps: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
-  { key: "activity",   label: "Activity",   max: 20,  icon: "⚡", color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d", steps: [0,2,4,6,8,10,12,14,16,18,20] },
-  { key: "technical",  label: "Technical",  max: 30,  icon: "💻", color: "#3b82f6", bg: "#eff6ff", border: "#93c5fd", steps: [0,5,10,15,20,25,30] },
-  { key: "behavior",   label: "Behavior",   max: 10,  icon: "🤝", color: "#ec4899", bg: "#fdf2f8", border: "#f9a8d4", steps: [0,1,2,3,4,5,6,7,8,9,10] },
-  { key: "initiative", label: "Initiative", max: 15,  icon: "🚀", color: "#6366f1", bg: "#eef2ff", border: "#a5b4fc", steps: [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15] },
+  { key: "attendance", label: "Attendance", max: 10,  icon: "🟢", color: "#10b981", bg: "#ecfdf5", border: "#6ee7b7" },
+  { key: "speak_up",   label: "Speak Up",   max: 15,  icon: "🎤", color: "#8b5cf6", bg: "#f5f3ff", border: "#c4b5fd" },
+  { key: "activity",   label: "Activity",   max: 20,  icon: "⚡", color: "#f59e0b", bg: "#fffbeb", border: "#fcd34d" },
+  { key: "technical",  label: "Technical",  max: 30,  icon: "💻", color: "#3b82f6", bg: "#eff6ff", border: "#93c5fd" },
+  { key: "behavior",   label: "Behavior",   max: 10,  icon: "🤝", color: "#ec4899", bg: "#fdf2f8", border: "#f9a8d4" },
+  { key: "initiative", label: "Initiative", max: 15,  icon: "🚀", color: "#6366f1", bg: "#eef2ff", border: "#a5b4fc" },
 ]
+
+// Every category is rated 0–10 by faculty; we convert to weighted points internally
+const RATING_LABELS: Record<number, string> = {
+  0:"Not Rated", 1:"Very Poor", 2:"Very Poor", 3:"Poor", 4:"Poor",
+  5:"Average", 6:"Average", 7:"Good", 8:"Good", 9:"Excellent", 10:"Excellent",
+}
+const ratingColor = (r: number) =>
+  r === 0 ? "#cbd5e1" : r <= 3 ? "#dc2626" : r <= 5 ? "#d97706" : r <= 7 ? "#2563eb" : "#059669"
+const toPoints = (rating: number, max: number) => Math.round((rating / 10) * max)
 
 const tierInfo = (t: number) =>
   t >= 90 ? { label: "Pro",       color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" }
@@ -42,7 +51,10 @@ const DEMO_STUDENTS = [
   { id:10,name:"Anjali Gupta",          email:"anjali@example.com",  rollNo:"STU-010" },
 ]
 
-const totalScore = (scores: Record<string, number>) => Object.values(scores).reduce((a,b) => a + b, 0)
+// ratings (0-10 per category) -> total weighted points out of 100
+const totalScore = (ratings: Record<string, number>) =>
+  METRICS.reduce((sum, m) => sum + toPoints(ratings[m.key] || 0, m.max), 0)
+
 const initials = (name: string) => name.split(" ").map((w: string) => w[0]).join("").slice(0,2).toUpperCase()
 const DRAFT_KEY = (sid: any, date: any) => `score_draft_${sid}_${date}`
 
@@ -153,13 +165,17 @@ export default function ScoreEntryFullRange({
 
     try {
       if (onSaveAll) {
-        await onSaveAll(toSave.map(({ student, sc }) => ({
-          student_id: student.id,
-          date,
-          ...sc,
-          total: totalScore(sc),
-          score_type: "daily",
-        })))
+        await onSaveAll(toSave.map(({ student, sc }) => {
+          const points: any = {}
+          METRICS.forEach(m => { points[m.key] = toPoints(sc[m.key] || 0, m.max) })
+          return {
+            student_id: student.id,
+            date,
+            ...points,
+            total: totalScore(sc),
+            score_type: "daily",
+          }
+        }))
       }
       const newSaved = { ...saved }
       toSave.forEach(({ student }) => {
@@ -271,15 +287,11 @@ export default function ScoreEntryFullRange({
         .frs-tier-pill { display:inline-block; padding:3px 12px; border-radius:20px; font-size:11px; font-weight:700; margin-top:4px; }
 
         .frs-metrics-area { flex:1; padding:20px 32px; overflow-y:auto; }
-        .frs-metric-row { display:flex; align-items:center; gap:16px; padding:16px 0; border-bottom:1px solid #f1f5f9; }
+        .frs-metric-row { display:flex; align-items:center; gap:16px; padding:18px 0; border-bottom:1px solid #f1f5f9; }
         .frs-metric-row:last-child { border-bottom:none; }
         .frs-metric-icon { font-size:24px; flex-shrink:0; }
         .frs-metric-label { font-size:15px; font-weight:700; color:#0f172a; min-width:110px; }
         .frs-metric-max { font-size:11px; color:#94a3b8; }
-        .frs-btn-grid { display:flex; flex-wrap:wrap; gap:6px; flex:1; }
-        .frs-score-btn { min-width:44px; height:38px; padding:0 8px; border-radius:9px; border:1.5px solid #e5e9f5; background:#fff; color:#64748b; font-size:13px; font-weight:700; cursor:pointer; font-family:'Plus Jakarta Sans',sans-serif; transition:all 0.15s; display:flex; align-items:center; justify-content:center; }
-        .frs-score-btn:hover { border-color:#a5b4fc; color:#5b5ef4; }
-        .frs-score-btn.selected { color:#fff; border-color:transparent; box-shadow:0 2px 8px rgba(0,0,0,0.15); transform:scale(1.08); }
 
         .frs-footer { background:#fff; border-top:1px solid #e5e9f5; padding:10px 32px; display:flex; align-items:center; flex-shrink:0; }
         .frs-autosave-note { font-size:12px; color:#94a3b8; display:flex; align-items:center; gap:6px; }
@@ -300,11 +312,10 @@ export default function ScoreEntryFullRange({
           .frs-right-header { padding:12px 16px; flex-wrap:wrap; }
           .frs-metrics-area { padding:16px; }
           .frs-footer { padding:10px 16px; }
-          .frs-btn-grid { gap:4px; }
-          .frs-score-btn { min-width:36px; height:34px; font-size:12px; }
           .frs-header-actions { flex-wrap:wrap; }
           .frs-total-wrap { border-left:none; padding-left:0; }
           .frs-att-badge { margin-left:0; }
+          .frs-metric-row { flex-wrap:wrap; }
         }
       `}</style>
 
@@ -362,8 +373,8 @@ export default function ScoreEntryFullRange({
 
         <div className="frs-topbar">
           <div>
-            <div className="frs-title">📝 Score Entry <span style={{fontSize:15,fontWeight:600,color:"#8b5cf6"}}>(Full Range Mode)</span></div>
-            <div className="frs-sub">Click on any score to select. Full range of marks are shown for easy selection.</div>
+            <div className="frs-title">📝 Score Entry</div>
+            <div className="frs-sub">Rate each category from 0–10. Points are calculated automatically based on category weight.</div>
           </div>
           <div className="frs-topbar-right">
             <input type="date" className="frs-date-input" value={date} onChange={e => setDate(e.target.value)} />
@@ -544,28 +555,35 @@ export default function ScoreEntryFullRange({
 
                 <div className="frs-metrics-area">
                   {METRICS.map(m => {
-                    const val = sc[m.key]
+                    const rating = sc[m.key] || 0
+                    const points = toPoints(rating, m.max)
                     return (
                       <div key={m.key} className="frs-metric-row">
                         <span className="frs-metric-icon">{m.icon}</span>
                         <div style={{minWidth:110}}>
                           <div className="frs-metric-label">{m.label}</div>
-                          <div className="frs-metric-max">/{m.max}</div>
+                          <div className="frs-metric-max">weight: {m.max} pts</div>
                         </div>
-                        <div className="frs-btn-grid">
-                          {m.steps.map(s => {
-                            const isSel = val === s
-                            return (
-                              <button
-                                key={s}
-                                className={`frs-score-btn ${isSel?"selected":""}`}
-                                style={isSel ? {background:m.color,borderColor:m.color} : {}}
-                                onClick={() => setStudentScore(sel.id, m.key, s)}
-                              >
-                                {s}{isSel && <span style={{marginLeft:3,fontSize:10}}>✓</span>}
-                              </button>
-                            )
-                          })}
+                        <div style={{flex:1, display:"flex", flexDirection:"column", gap:8, minWidth:220}}>
+                          <div style={{display:"flex", alignItems:"center", gap:14}}>
+                            <input
+                              type="range" min={0} max={10} step={1} value={rating}
+                              onChange={e => setStudentScore(sel.id, m.key, Number(e.target.value))}
+                              style={{ flex:1, accentColor: ratingColor(rating), height:6, cursor:"pointer" }}
+                            />
+                            <div style={{
+                              minWidth:66, textAlign:"center", padding:"6px 10px", borderRadius:9,
+                              background: rating===0 ? "#f1f5f9" : m.bg,
+                              border:`1.5px solid ${rating===0?"#e5e9f5":m.border}`,
+                              fontWeight:800, fontSize:15, color: rating===0 ? "#94a3b8" : m.color,
+                            }}>
+                              {rating}/10
+                            </div>
+                          </div>
+                          <div style={{display:"flex", justifyContent:"space-between", fontSize:11.5}}>
+                            <span style={{color: ratingColor(rating), fontWeight:700}}>{RATING_LABELS[rating]}</span>
+                            <span style={{color:"#94a3b8", fontWeight:600}}>→ {points}/{m.max} pts</span>
+                          </div>
                         </div>
                       </div>
                     )
