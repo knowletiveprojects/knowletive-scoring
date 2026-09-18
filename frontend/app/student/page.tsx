@@ -3,6 +3,7 @@ import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { getMyScores, getLeaderboard, getWeeklyLeaderboard, getMonthlyLeaderboard, getStudentRewards, updateStudentPhoto } from "@/lib/api"
 import ProjectUpdateForm from "@/components/ProjectUpdateForm"
+import WeeklyChart from "@/components/WeeklyChart"
 
 const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"
 
@@ -369,7 +370,9 @@ export default function StudentPage() {
           {/* Score History */}
           {scores.length > 1 && (
             <div className="card fade" style={{ padding:22, marginBottom:16, animationDelay:"0.1s" }}>
-              <h2 style={{ fontFamily:"'Outfit',sans-serif", fontSize:16, fontWeight:700, color:"#0f172a", margin:"0 0 16px" }}>📈 Score History</h2>
+              <WeeklyChart scores={scores} />
+
+              <h2 style={{ fontFamily:"'Outfit',sans-serif", fontSize:16, fontWeight:700, color:"#0f172a", margin:"24px 0 16px" }}>📋 Detailed History</h2>
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {scores.slice(1).map((s: any, i: number) => (
                   <div key={i} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"12px 16px", borderRadius:12, background:"#f8fafc", border:"1px solid #f1f5f9" }}>
