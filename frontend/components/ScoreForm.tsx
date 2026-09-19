@@ -21,6 +21,15 @@ const ratingColor = (r: number) =>
   r === 0 ? "#cbd5e1" : r <= 3 ? "#dc2626" : r <= 5 ? "#d97706" : r <= 7 ? "#2563eb" : "#059669"
 const toPoints = (rating: number, max: number) => Math.round((rating / 10) * max)
 
+// Map an Attendance Tracker status to an auto rating (0-10)
+const attendanceStatusToRating = (status?: string): number | null => {
+  if (status === "present")  return 10
+  if (status === "half_day") return 5
+  if (status === "absent")   return 0
+  if (status === "holiday")  return 10
+  return null // no record for this date — fall back to manual
+}
+
 const tierInfo = (t: number) =>
   t >= 90 ? { label: "Pro",       color: "#7c3aed", bg: "#f5f3ff", border: "#ddd6fe" }
   : t >= 75 ? { label: "Good",    color: "#2563eb", bg: "#eff6ff", border: "#bfdbfe" }
@@ -94,6 +103,8 @@ export default function ScoreEntryFullRange({
   // ✅ Attendance summary for selected student
   const [attendance, setAttendance] = useState<Record<string, string>>({})
   const [attLoading, setAttLoading] = useState(false)
+  // Track which (student, date) combos faculty chose to manually override
+  const [attOverride, setAttOverride] = useState<Record<string, boolean>>({})
 
   const showToast = (msg: string, type = "success") => {
     setToast({ msg, type })
@@ -156,6 +167,23 @@ export default function ScoreEntryFullRange({
   const attHoliday = attVals.filter(v => v === "holiday").length
   const attMarked  = attPresent + attHalf + attAbsent + attHoliday
   const attPct     = attMarked > 0 ? Math.round(((attPresent + attHalf * 0.5) / attMarked) * 100) : 0
+
+  const overrideKey = sel ? `${sel.id}_${date}` : ""
+  const todayStatus = attendance[date] // this student's attendance status for the selected date
+  const autoRating = attendanceStatusToRating(todayStatus)
+  const isAttendanceSynced = autoRating !== null && !attOverride[overrideKey]
+
+  // ✅ Auto-fill Attendance score from Attendance Tracker, unless faculty overrode it
+  useEffect(() => {
+    if (!sel) return
+    if (attLoading) return
+    if (autoRating === null) return           // no record for this date — leave manual
+    if (attOverride[overrideKey]) return       // faculty chose to edit manually
+    if ((scores[sel.id]?.attendance ?? 0) !== autoRating) {
+      setStudentScore(sel.id, "attendance", autoRating)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sel?.id, date, todayStatus, attLoading])
 
   const handleSave = async (single = false) => {
     setSaving(true)
@@ -557,6 +585,9 @@ export default function ScoreEntryFullRange({
                   {METRICS.map(m => {
                     const rating = sc[m.key] || 0
                     const points = toPoints(rating, m.max)
+                    const isAttendanceRow = m.key === "attendance"
+                    const locked = isAttendanceRow && isAttendanceSynced
+
                     return (
                       <div key={m.key} className="frs-metric-row">
                         <span className="frs-metric-icon">{m.icon}</span>
@@ -565,25 +596,71 @@ export default function ScoreEntryFullRange({
                           <div className="frs-metric-max">weight: {m.max} pts</div>
                         </div>
                         <div style={{flex:1, display:"flex", flexDirection:"column", gap:8, minWidth:220}}>
-                          <div style={{display:"flex", alignItems:"center", gap:14}}>
-                            <input
-                              type="range" min={0} max={10} step={1} value={rating}
-                              onChange={e => setStudentScore(sel.id, m.key, Number(e.target.value))}
-                              style={{ flex:1, accentColor: ratingColor(rating), height:6, cursor:"pointer" }}
-                            />
-                            <div style={{
-                              minWidth:66, textAlign:"center", padding:"6px 10px", borderRadius:9,
-                              background: rating===0 ? "#f1f5f9" : m.bg,
-                              border:`1.5px solid ${rating===0?"#e5e9f5":m.border}`,
-                              fontWeight:800, fontSize:15, color: rating===0 ? "#94a3b8" : m.color,
-                            }}>
-                              {rating}/10
-                            </div>
-                          </div>
-                          <div style={{display:"flex", justifyContent:"space-between", fontSize:11.5}}>
-                            <span style={{color: ratingColor(rating), fontWeight:700}}>{RATING_LABELS[rating]}</span>
-                            <span style={{color:"#94a3b8", fontWeight:600}}>→ {points}/{m.max} pts</span>
-                          </div>
+
+                          {locked ? (
+                            <>
+                              <div style={{display:"flex", alignItems:"center", gap:10, flexWrap:"wrap"}}>
+                                <span style={{
+                                  fontSize:11.5, fontWeight:700, color:"#059669", background:"#ecfdf5",
+                                  border:"1px solid #a7f3d0", borderRadius:20, padding:"4px 10px",
+                                  display:"flex", alignItems:"center", gap:5,
+                                }}>
+                                  🔄 Synced from Attendance Tracker — {todayStatus === "present" ? "Present" : todayStatus === "half_day" ? "Half Day" : todayStatus === "absent" ? "Absent" : "Holiday"}
+                                </span>
+                                <button
+                                  onClick={() => setAttOverride(prev => ({ ...prev, [overrideKey]: true }))}
+                                  style={{ background:"none", border:"none", cursor:"pointer", fontSize:11.5, color:"#5b5ef4", fontWeight:700, textDecoration:"underline" }}
+                                >
+                                  Edit manually
+                                </button>
+                              </div>
+                              <div style={{display:"flex", alignItems:"center", gap:14}}>
+                                <div style={{ flex:1, height:6, borderRadius:99, background:"#f1f5f9", overflow:"hidden" }}>
+                                  <div style={{ height:"100%", width:`${rating*10}%`, background: m.color, borderRadius:99 }} />
+                                </div>
+                                <div style={{
+                                  minWidth:66, textAlign:"center", padding:"6px 10px", borderRadius:9,
+                                  background:m.bg, border:`1.5px solid ${m.border}`,
+                                  fontWeight:800, fontSize:15, color:m.color,
+                                }}>
+                                  {rating}/10
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <>
+                              <div style={{display:"flex", alignItems:"center", gap:14}}>
+                                <input
+                                  type="range" min={0} max={10} step={1} value={rating}
+                                  onChange={e => setStudentScore(sel.id, m.key, Number(e.target.value))}
+                                  style={{ flex:1, accentColor: ratingColor(rating), height:6, cursor:"pointer" }}
+                                />
+                                <div style={{
+                                  minWidth:66, textAlign:"center", padding:"6px 10px", borderRadius:9,
+                                  background: rating===0 ? "#f1f5f9" : m.bg,
+                                  border:`1.5px solid ${rating===0?"#e5e9f5":m.border}`,
+                                  fontWeight:800, fontSize:15, color: rating===0 ? "#94a3b8" : m.color,
+                                }}>
+                                  {rating}/10
+                                </div>
+                              </div>
+                              <div style={{display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:11.5}}>
+                                <span style={{color: ratingColor(rating), fontWeight:700}}>{RATING_LABELS[rating]}</span>
+                                <span style={{display:"flex", alignItems:"center", gap:10}}>
+                                  {isAttendanceRow && attOverride[overrideKey] && (
+                                    <button
+                                      onClick={() => setAttOverride(prev => { const n = { ...prev }; delete n[overrideKey]; return n })}
+                                      style={{ background:"none", border:"none", cursor:"pointer", fontSize:11, color:"#5b5ef4", fontWeight:700, textDecoration:"underline" }}
+                                    >
+                                      Use synced value
+                                    </button>
+                                  )}
+                                  <span style={{color:"#94a3b8", fontWeight:600}}>→ {points}/{m.max} pts</span>
+                                </span>
+                              </div>
+                            </>
+                          )}
+
                         </div>
                       </div>
                     )
