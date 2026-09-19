@@ -106,9 +106,9 @@ export default function LoginPage() {
         .rp-accent { position:absolute; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#14b8a6,#06b6d4,#6366f1); }
 
         .logo-badge {
-          width:96px; height:96px; border-radius:22px; display:flex; align-items:center; justify-content:center;
+          width:120px; height:120px; border-radius:26px; display:flex; align-items:center; justify-content:center;
           background:linear-gradient(135deg,#f0fdfa,#eff6ff); border:1px solid #e0f2fe;
-          box-shadow:0 10px 28px rgba(20,184,166,0.14);
+          box-shadow:0 12px 32px rgba(20,184,166,0.16);
         }
 
         /* feature rows */
@@ -242,7 +242,7 @@ export default function LoginPage() {
           <div className="f1" style={{textAlign:"center",marginBottom:26,width:"100%"}}>
             <div style={{display:"flex",justifyContent:"center",marginBottom:16}}>
               <div className="logo-badge">
-                <Image src="/logo.png" alt="Knowletive" width={68} height={68} style={{objectFit:"contain"}}/>
+                <Image src="/logo.png" alt="Knowletive" width={92} height={92} style={{objectFit:"contain"}}/>
               </div>
             </div>
             <h2 style={{fontFamily:"'Outfit',sans-serif",fontSize:24,fontWeight:800,color:"#0f172a",letterSpacing:"-0.5px",marginBottom:6}}>Welcome back</h2>
