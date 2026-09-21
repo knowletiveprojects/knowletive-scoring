@@ -5,16 +5,20 @@ from typing import Optional, List
 class AttendanceCreate(BaseModel):
     student_id: int
     date: date
-    status: str  # "present", "absent", "holiday"
+    status: str  # "present", "absent", "holiday", "half_day"
 
 class AttendanceUpdate(BaseModel):
     status: str
+
+class AttendanceReasonUpdate(BaseModel):
+    reason: str
 
 class AttendanceResponse(BaseModel):
     id: int
     student_id: int
     date: date
     status: str
+    reason: Optional[str] = None
 
     class Config:
         from_attributes = True

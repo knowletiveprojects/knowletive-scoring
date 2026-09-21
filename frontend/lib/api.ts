@@ -122,6 +122,14 @@ export const markActivityStatus = (data: { activity_id: number; student_name: st
 export const getActivityHistory = () =>
   API.get("/activities/history")
 
+// ── Absence Reason (add these two functions to the "Attendance" section of lib/api.ts) ──
+export const getPendingAbsenceReasons = (studentId: number) =>
+  API.get(`/attendance/student/${studentId}/pending-reason`)
+
+export const submitAbsenceReason = (attendanceId: number, reason: string) =>
+  API.patch(`/attendance/${attendanceId}/reason`, { reason })
+
+
 // Study Material
 export const createStudyEntry = (data: {
   date: string

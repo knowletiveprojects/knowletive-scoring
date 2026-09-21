@@ -1,7 +1,7 @@
 "use client"
 import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
-import { getMyScores, getLeaderboard, getWeeklyLeaderboard, getMonthlyLeaderboard, getStudentRewards, updateStudentPhoto } from "@/lib/api"
+import { getMyScores, getLeaderboard, getWeeklyLeaderboard, getMonthlyLeaderboard, getStudentRewards, updateStudentPhoto, getPendingAbsenceReasons, submitAbsenceReason } from "@/lib/api"
 import ProjectUpdateForm from "@/components/ProjectUpdateForm"
 import WeeklyChart from "@/components/WeeklyChart"
 
@@ -35,6 +35,11 @@ export default function StudentPage() {
   const [periodLeaderboard, setPeriodLeaderboard] = useState<any[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // ✅ Absence reason state
+  const [pendingAbsences, setPendingAbsences] = useState<any[]>([])
+  const [reasonDrafts, setReasonDrafts] = useState<Record<number, string>>({})
+  const [submittingReason, setSubmittingReason] = useState<number | null>(null)
+
   const showToast = (msg: string, type = "success") => {
     setToast({ msg, type })
     setTimeout(() => setToast(null), 3000)
@@ -55,6 +60,7 @@ export default function StudentPage() {
 
     fetchData(parsed.id)
     fetchPeriodLeaderboard("daily")
+    fetchPendingAbsences(parsed.id)
 
     // ✅ Fetch interpersonal skills from backend
     fetch(`${API}/skills/student/${parsed.id}`)
@@ -93,6 +99,32 @@ export default function StudentPage() {
       setLeaderboard(lb.data)
       setRewards(r.data)
     } catch {}
+  }
+
+  // ✅ Fetch absences still needing a reason
+  const fetchPendingAbsences = async (id: number) => {
+    try {
+      const res = await getPendingAbsenceReasons(id)
+      setPendingAbsences(res.data)
+    } catch {
+      setPendingAbsences([])
+    }
+  }
+
+  // ✅ Submit a reason for a specific absence
+  const handleSubmitReason = async (attendanceId: number) => {
+    const reason = (reasonDrafts[attendanceId] || "").trim()
+    if (!reason) { showToast("Please enter a reason", "warning"); return }
+    setSubmittingReason(attendanceId)
+    try {
+      await submitAbsenceReason(attendanceId, reason)
+      setPendingAbsences(prev => prev.filter(a => a.id !== attendanceId))
+      setReasonDrafts(prev => { const n = { ...prev }; delete n[attendanceId]; return n })
+      showToast("Reason submitted ✅")
+    } catch {
+      showToast("Error submitting reason", "error")
+    }
+    setSubmittingReason(null)
   }
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -228,6 +260,61 @@ export default function StudentPage() {
 
         {/* Content */}
         <div style={{ maxWidth:760, margin:"0 auto", padding:"24px" }}>
+
+          {/* ✅ Absence notification + reason form */}
+          {pendingAbsences.length > 0 && (
+            <div className="card fade" style={{
+              padding: 20, marginBottom: 16, background: "#fef2f2",
+              border: "1.5px solid #fecaca",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <span style={{ fontSize: 22 }}>🔔</span>
+                <div>
+                  <div style={{ fontWeight: 800, fontSize: 15, color: "#991b1b" }}>
+                    You were marked absent
+                  </div>
+                  <div style={{ fontSize: 12.5, color: "#b91c1c", marginTop: 2 }}>
+                    Please let your faculty know the reason
+                  </div>
+                </div>
+              </div>
+
+              {pendingAbsences.map((a: any) => (
+                <div key={a.id} style={{
+                  background: "#fff", borderRadius: 12, border: "1px solid #fecaca",
+                  padding: 14, marginBottom: 10,
+                }}>
+                  <div style={{ fontWeight: 700, fontSize: 13.5, color: "#0f172a", marginBottom: 8 }}>
+                    📅 {new Date(a.date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" })}
+                  </div>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. I was unwell / family emergency / traveling..."
+                    value={reasonDrafts[a.id] || ""}
+                    onChange={e => setReasonDrafts(prev => ({ ...prev, [a.id]: e.target.value }))}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: 9,
+                      border: "1.5px solid #e2e8f0", fontSize: 13.5, fontFamily: "inherit",
+                      outline: "none", resize: "vertical", color: "#0f172a", marginBottom: 10,
+                      boxSizing: "border-box",
+                    }}
+                  />
+                  <button
+                    onClick={() => handleSubmitReason(a.id)}
+                    disabled={submittingReason === a.id}
+                    style={{
+                      padding: "9px 18px", borderRadius: 9, border: "none", cursor: "pointer",
+                      fontWeight: 700, fontSize: 13, fontFamily: "inherit", color: "#fff",
+                      background: "linear-gradient(135deg,#dc2626,#ef4444)",
+                      opacity: submittingReason === a.id ? 0.6 : 1,
+                    }}
+                  >
+                    {submittingReason === a.id ? "Submitting..." : "Submit Reason"}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Today's Score */}
           {latest ? (

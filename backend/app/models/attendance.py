@@ -9,7 +9,8 @@ class Attendance(Base):
     id         = Column(Integer, primary_key=True, index=True)
     student_id = Column(Integer, ForeignKey("students.id"), nullable=False)
     date       = Column(Date, nullable=False)
-    status     = Column(String, nullable=False)  # "present", "absent", "holiday"
+    status     = Column(String, nullable=False)  # "present", "absent", "holiday", "half_day"
+    reason     = Column(String, nullable=True)    # student-submitted reason for absence (optional)
 
     student = relationship("Student", back_populates="attendance")
 

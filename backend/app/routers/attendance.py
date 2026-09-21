@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from app.models.attendance import Attendance
 from app.models.student import Student
-from app.schemas.attendance import AttendanceCreate, AttendanceResponse, BulkAttendanceCreate
+from app.schemas.attendance import AttendanceCreate, AttendanceResponse, BulkAttendanceCreate, AttendanceReasonUpdate
 from typing import List, Optional
 from datetime import date
 
@@ -53,6 +53,7 @@ def get_attendance_by_date(date: date, batch_id: Optional[int] = None, db: Sessi
             "student_name": name,
             "date": str(a.date),
             "status": a.status,
+            "reason": a.reason,
         }
         for a, name in results
     ]
@@ -84,6 +85,35 @@ def get_attendance_summary(batch_id: Optional[int] = None, db: Session = Depends
             **stats,
         })
     return result
+
+
+# ✅ Records with an absence still awaiting a reason from the student
+@router.get("/student/{student_id}/pending-reason", response_model=List[AttendanceResponse])
+def get_pending_reason(student_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(Attendance)
+        .filter(
+            Attendance.student_id == student_id,
+            Attendance.status == "absent",
+            (Attendance.reason == None) | (Attendance.reason == ""),
+        )
+        .order_by(Attendance.date.desc())
+        .all()
+    )
+
+
+# ✅ Student submits/updates their reason for a specific absence
+@router.patch("/{attendance_id}/reason", response_model=AttendanceResponse)
+def submit_absence_reason(attendance_id: int, payload: AttendanceReasonUpdate, db: Session = Depends(get_db)):
+    record = db.query(Attendance).filter(Attendance.id == attendance_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+    if record.status != "absent":
+        raise HTTPException(status_code=400, detail="Reason can only be submitted for an absent record")
+    record.reason = payload.reason
+    db.commit()
+    db.refresh(record)
+    return record
 
 
 @router.post("/mark", response_model=AttendanceResponse)

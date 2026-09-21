@@ -42,6 +42,8 @@ const calcPct = (rec: Record<string, Status>) => {
 export default function AttendanceTracker() {
   const [students, setStudents] = useState<any[]>([])
   const [attendance, setAttendance] = useState<Record<number, Record<string, Status>>>({})
+  // ✅ Reason submitted by the student for a given absent date
+  const [reasonMap, setReasonMap] = useState<Record<number, Record<string, string>>>({})
   const [selectedDate, setSelectedDate] = useState(today())
   const [view, setView] = useState<"mark" | "summary">("mark")
   const [detailStudent, setDetailStudent] = useState<any>(null)
@@ -64,13 +66,19 @@ export default function AttendanceTracker() {
       const res = await fetch(`${API}/attendance/`)
       const data: any[] = await res.json()
       const map: Record<number, Record<string, Status>> = {}
+      const rMap: Record<number, Record<string, string>> = {}
       const dates = new Set<string>()
       data.forEach(r => {
         if (!map[r.student_id]) map[r.student_id] = {}
         map[r.student_id][r.date] = r.status as Status
+        if (r.reason) {
+          if (!rMap[r.student_id]) rMap[r.student_id] = {}
+          rMap[r.student_id][r.date] = r.reason
+        }
         dates.add(r.date)
       })
       setAttendance(map)
+      setReasonMap(rMap)
       setAllDates(Array.from(dates).sort())
     } catch {}
     setLoading(false)
@@ -258,45 +266,66 @@ export default function AttendanceTracker() {
                 const [g1, g2] = avatarColors[i % avatarColors.length]
                 const stats = statsFor(student.id)
                 const isSaving = saving === student.id
+                const reasonToday = reasonMap[student.id]?.[selectedDate]
                 return (
                   <div key={student.id} style={{
                     background: status ? st.bg + "55" : "#fff",
                     border:`1.5px solid ${status ? st.border : "#e5e9f5"}`,
                     borderRadius:14, padding:"14px 18px",
-                    display:"flex", alignItems:"center", gap:12,
+                    display:"flex", flexDirection:"column", gap:8,
                     boxShadow:"0 1px 3px rgba(0,0,0,0.04)", transition:"all 0.2s",
                     opacity: isSaving ? 0.7 : 1,
                   }}>
-                    <div style={{ width:42, height:42, borderRadius:11, background:`linear-gradient(135deg,${g1},${g2})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:"#fff", flexShrink:0, overflow:"hidden" }}>
-                      {student.photo
-                        ? <img src={student.photo} alt={student.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
-                        : student.name.charAt(0).toUpperCase()
-                      }
-                    </div>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{student.name}</div>
-                      <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>
-                        P:{stats.present} · HD:{stats.half_day} · A:{stats.absent} · H:{stats.holiday}
+                    <div style={{ display:"flex", alignItems:"center", gap:12 }}>
+                      <div style={{ width:42, height:42, borderRadius:11, background:`linear-gradient(135deg,${g1},${g2})`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:15, fontWeight:800, color:"#fff", flexShrink:0, overflow:"hidden" }}>
+                        {student.photo
+                          ? <img src={student.photo} alt={student.name} style={{ width:"100%", height:"100%", objectFit:"cover" }} />
+                          : student.name.charAt(0).toUpperCase()
+                        }
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontWeight:700, fontSize:14, color:"#0f172a", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{student.name}</div>
+                        <div style={{ fontSize:11, color:"#64748b", marginTop:2 }}>
+                          P:{stats.present} · HD:{stats.half_day} · A:{stats.absent} · H:{stats.holiday}
+                        </div>
+                      </div>
+                      {/* 4 status buttons */}
+                      <div style={{ display:"flex", gap:5, flexShrink:0 }}>
+                        {STATUS_BTNS.map(([s,l,bg,color,border]) => (
+                          <button key={s} onClick={() => markOne(student.id, s)} disabled={isSaving} style={{
+                            width: s === "half_day" ? 40 : 34, height:34, borderRadius:8,
+                            border:`2px solid ${status === s ? color : border}`,
+                            background: status === s ? color : bg,
+                            color: status === s ? "#fff" : color,
+                            fontWeight:800, fontSize:11, cursor:"pointer",
+                            fontFamily:"inherit", transition:"all 0.15s",
+                            boxShadow: status === s ? `0 2px 8px ${color}55` : "none",
+                          }}>{l}</button>
+                        ))}
+                      </div>
+                      <div style={{ textAlign:"right", minWidth:52, flexShrink:0 }}>
+                        <div style={{ fontSize:20, fontWeight:800, color:getPctColor(stats.pct), lineHeight:1 }}>{stats.pct}%</div>
+                        <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{stats.marked} days</div>
                       </div>
                     </div>
-                    {/* 4 status buttons */}
-                    <div style={{ display:"flex", gap:5, flexShrink:0 }}>
-                      {STATUS_BTNS.map(([s,l,bg,color,border]) => (
-                        <button key={s} onClick={() => markOne(student.id, s)} disabled={isSaving} style={{
-                          width: s === "half_day" ? 40 : 34, height:34, borderRadius:8,
-                          border:`2px solid ${status === s ? color : border}`,
-                          background: status === s ? color : bg,
-                          color: status === s ? "#fff" : color,
-                          fontWeight:800, fontSize:11, cursor:"pointer",
-                          fontFamily:"inherit", transition:"all 0.15s",
-                          boxShadow: status === s ? `0 2px 8px ${color}55` : "none",
-                        }}>{l}</button>
-                      ))}
-                    </div>
-                    <div style={{ textAlign:"right", minWidth:52, flexShrink:0 }}>
-                      <div style={{ fontSize:20, fontWeight:800, color:getPctColor(stats.pct), lineHeight:1 }}>{stats.pct}%</div>
-                      <div style={{ fontSize:10, color:"#94a3b8", marginTop:2 }}>{stats.marked} days</div>
-                    </div>
+
+                    {/* ✅ Show student's submitted reason, if this date is marked absent */}
+                    {status === "absent" && (
+                      <div style={{
+                        marginLeft:54, padding:"8px 12px", borderRadius:9,
+                        background: reasonToday ? "#fff" : "#fffbeb",
+                        border:`1px solid ${reasonToday ? "#fecaca" : "#fde68a"}`,
+                      }}>
+                        {reasonToday ? (
+                          <>
+                            <span style={{ fontSize:10.5, fontWeight:700, color:"#dc2626", textTransform:"uppercase" as const, letterSpacing:"0.5px" }}>💬 Student's Reason</span>
+                            <div style={{ fontSize:13, color:"#334155", marginTop:3 }}>{reasonToday}</div>
+                          </>
+                        ) : (
+                          <span style={{ fontSize:12, color:"#b45309", fontWeight:600 }}>⏳ Waiting for student to submit a reason</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -341,9 +370,11 @@ export default function AttendanceTracker() {
                     <div style={{ display:"flex", gap:4 }}>
                       {recent7.map(d => {
                         const st = statusStyle((attendance[s.id]?.[d] || "") as Status)
+                        const hasReason = !!reasonMap[s.id]?.[d]
                         return (
-                          <div key={d} title={d} style={{ width:28, height:28, borderRadius:6, background:st.bg, border:`1px solid ${st.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:st.color }}>
+                          <div key={d} title={hasReason ? reasonMap[s.id][d] : d} style={{ position:"relative", width:28, height:28, borderRadius:6, background:st.bg, border:`1px solid ${st.border}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:9, fontWeight:800, color:st.color }}>
                             {st.label}
+                            {hasReason && <span style={{ position:"absolute", top:-3, right:-3, fontSize:8 }}>💬</span>}
                           </div>
                         )
                       })}
@@ -364,6 +395,7 @@ export default function AttendanceTracker() {
       {view === "summary" && detailStudent && (() => {
         const stats = statsFor(detailStudent.id)
         const rec = attendance[detailStudent.id] || {}
+        const reasons = reasonMap[detailStudent.id] || {}
         return (
           <div>
             <button onClick={() => setDetailStudent(null)}
@@ -414,6 +446,30 @@ export default function AttendanceTracker() {
                   </div>
                 ))}
               </div>
+
+              {/* ✅ Absence reasons list */}
+              {stats.absent > 0 && (
+                <div style={{ marginBottom:24 }}>
+                  <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase" as const, marginBottom:12 }}>
+                    Absence Reasons
+                  </div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                    {Object.entries(rec).filter(([, status]) => status === "absent").sort(([a],[b]) => b.localeCompare(a)).map(([d]) => {
+                      const dl = new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day:"numeric", month:"short", year:"numeric" })
+                      const reason = reasons[d]
+                      return (
+                        <div key={d} style={{ padding:"10px 14px", borderRadius:10, background: reason ? "#fef2f2" : "#fffbeb", border:`1px solid ${reason ? "#fecaca" : "#fde68a"}` }}>
+                          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                            <span style={{ fontSize:12.5, fontWeight:700, color:"#0f172a" }}>{dl}</span>
+                            {!reason && <span style={{ fontSize:11, color:"#b45309", fontWeight:600 }}>⏳ Pending</span>}
+                          </div>
+                          {reason && <div style={{ fontSize:13, color:"#334155", marginTop:4 }}>💬 {reason}</div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
 
               <div style={{ fontSize:11, fontWeight:700, color:"#94a3b8", letterSpacing:"1px", textTransform:"uppercase" as const, marginBottom:14 }}>
                 Day-wise Record ({allDates.length} days marked)
