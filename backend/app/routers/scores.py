@@ -293,6 +293,50 @@ def all_students_average(days: int = 7, batch_id: int = None, db: Session = Depe
     } for r in results]
 
 
+# ✅ Day-by-day class average trend — powers the faculty Analytics chart
+@router.get("/class-trend")
+def class_trend(days: int = 14, batch_id: int = None, db: Session = Depends(get_db)):
+    end = date.today()
+    start = end - timedelta(days=days - 1)
+
+    query = (
+        db.query(
+            Score.date,
+            func.avg(Score.total).label("avg_total"),
+            func.avg(Score.attendance).label("avg_attendance"),
+            func.avg(Score.speak_up).label("avg_speak_up"),
+            func.avg(Score.activity).label("avg_activity"),
+            func.avg(Score.technical).label("avg_technical"),
+            func.avg(Score.behavior).label("avg_behavior"),
+            func.avg(Score.initiative).label("avg_initiative"),
+            func.count(Score.id).label("sessions"),
+        )
+        .join(Student, Score.student_id == Student.id)
+        .filter(
+            Score.date >= start,
+            Score.date <= end,
+            Score.total > 0,
+            Score.score_type == "daily",
+        )
+    )
+    if batch_id is not None:
+        query = query.filter(Student.batch_id == batch_id)
+
+    results = query.group_by(Score.date).order_by(Score.date).all()
+
+    return [{
+        "date": str(r.date),
+        "avg_total":       round(float(r.avg_total or 0), 1),
+        "avg_attendance":  round(float(r.avg_attendance or 0), 1),
+        "avg_speak_up":    round(float(r.avg_speak_up or 0), 1),
+        "avg_activity":    round(float(r.avg_activity or 0), 1),
+        "avg_technical":   round(float(r.avg_technical or 0), 1),
+        "avg_behavior":    round(float(r.avg_behavior or 0), 1),
+        "avg_initiative":  round(float(r.avg_initiative or 0), 1),
+        "sessions": r.sessions,
+    } for r in results]
+
+
 @router.get("/streak/{student_id}")
 def get_streak(student_id: int, db: Session = Depends(get_db)):
     today = date.today()
