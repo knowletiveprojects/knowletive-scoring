@@ -121,7 +121,7 @@ export default function ScoreEntryFullRange({
     })
     setScores(loaded)
     setSaved({})
-  }, [date])
+  }, [date, students.length])
 
   const getScores = (sid: any) => scores[sid] || emptyScores()
   const setStudentScore = (sid: any, key: string, val: number) => {
