@@ -130,6 +130,10 @@ export const submitAbsenceReason = (attendanceId: number, reason: string) =>
   API.patch(`/attendance/${attendanceId}/reason`, { reason })
 
 
+// Add this function to the "Averages & Streaks" section of lib/api.ts
+export const getClassTrend = (days: number, batchId?: number) =>
+  API.get("/scores/class-trend", { params: batchId ? { days, batch_id: batchId } : { days } })
+
 // Study Material
 export const createStudyEntry = (data: {
   date: string
