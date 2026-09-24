@@ -9,6 +9,7 @@ import DailyActivity from "@/components/Dailyactivity"
 import InterpersonalSkills from "@/components/InterpersonalSkills"
 import ProjectUpdates from "@/components/ProjectUpdates"
 import ScoreEntryFullRange from "@/components/ScoreForm"
+import ClassTrendChart from "@/components/ClassTrendChart"
 export const dynamic = "force-dynamic"
 
 
@@ -19,6 +20,7 @@ import {
   getWeeklyLeaderboard, getMonthlyLeaderboard,
   getAllAverages, getAllStreaks,
   updateStudentPhoto, updateStudent, getActiveBatches,
+  getClassTrend,
 } from "@/lib/api"
 
 type Period = "daily" | "weekly" | "monthly"
@@ -245,6 +247,10 @@ function FacultyPageContent() {
   const [expandedStudent, setExpandedStudent] = useState<number|null>(null)
   const [customDays, setCustomDays] = useState("")
 
+  // ✅ Class-wide trend chart
+  const [classTrend, setClassTrend] = useState<any[]>([])
+  const [trendView, setTrendView] = useState<"overall" | "category">("overall")
+
   useEffect(() => {
     if (!localStorage.getItem("faculty_auth")) { router.replace("/login"); return }
     fetchBatches()
@@ -255,6 +261,7 @@ function FacultyPageContent() {
     if (!selectedBatchId) return
     fetchBase()
     fetchAnalytics(analyticsDays)
+    fetchClassTrend(analyticsDays)
     fetchLeaderboard(dashPeriod, "dash")
     fetchLeaderboard(scorePeriod, "score")
     fetchStreaks()
@@ -315,6 +322,16 @@ function FacultyPageContent() {
       setAnalytics(res.data)
     } catch {}
     setAnalyticsLoading(false)
+  }
+
+  // ✅ Fetch day-by-day class average trend
+  const fetchClassTrend = async (days: number) => {
+    try {
+      const res = await getClassTrend(days, selectedBatchId ? Number(selectedBatchId) : undefined)
+      setClassTrend(res.data)
+    } catch {
+      setClassTrend([])
+    }
   }
 
   const fetchStreaks = async () => {
@@ -578,6 +595,7 @@ function FacultyPageContent() {
         .cat-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:10px; }
         .cat-card { background:#fff; border:1px solid var(--border); border-radius:12px; padding:14px 16px; }
         .day-btn { padding:8px 14px; border-radius:9px; border:none; cursor:pointer; font-weight:700; font-size:13px; font-family:var(--font); transition:all 0.2s; }
+        .trend-toggle-btn { padding:7px 16px; border-radius:9px; border:none; cursor:pointer; font-weight:700; font-size:12.5px; font-family:var(--font); transition:all 0.2s; }
         .mobile-bar { display:none; }
         .sidebar-visible { display:flex; }
         @media(max-width:768px){
@@ -1095,12 +1113,33 @@ function FacultyPageContent() {
                 <h1 className="page-title">📈 Performance Analytics</h1>
                 <p className="page-sub">Average scores and category breakdown per student</p>
               </div>
+
+              {/* ✅ Class-wide trend chart */}
+              <div className="card fu fu1" style={{ marginBottom:24 }}>
+                <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:18, flexWrap:"wrap", gap:10 }}>
+                  <div className="sec-label" style={{ marginBottom:0, paddingBottom:0, border:"none" }}>📈 Class Trend — Last {analyticsDays} Days</div>
+                  <div style={{ display:"flex", gap:6, background:"#f1f5f9", padding:4, borderRadius:12 }}>
+                    <button
+                      className="trend-toggle-btn"
+                      onClick={() => setTrendView("overall")}
+                      style={{ background: trendView==="overall" ? "#fff" : "transparent", color: trendView==="overall" ? "#5b5ef4" : "#94a3b8", boxShadow: trendView==="overall" ? "0 2px 8px rgba(0,0,0,0.1)" : "none" }}
+                    >📊 Overall</button>
+                    <button
+                      className="trend-toggle-btn"
+                      onClick={() => setTrendView("category")}
+                      style={{ background: trendView==="category" ? "#fff" : "transparent", color: trendView==="category" ? "#5b5ef4" : "#94a3b8", boxShadow: trendView==="category" ? "0 2px 8px rgba(0,0,0,0.1)" : "none" }}
+                    >🎯 By Category</button>
+                  </div>
+                </div>
+                <ClassTrendChart data={classTrend} view={trendView} />
+              </div>
+
               <div className="card fu fu1" style={{ marginBottom:24, padding:"18px 24px" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:12, flexWrap:"wrap" }}>
                   <span style={{ fontSize:13, fontWeight:600, color:"var(--muted)" }}>Show averages for last:</span>
                   <div style={{ display:"flex", gap:6, background:"#f1f5f9", padding:4, borderRadius:12 }}>
                     {[4, 7, 14, 30].map(d => (
-                      <button key={d} className="day-btn" onClick={() => { setAnalyticsDays(d); fetchAnalytics(d) }}
+                      <button key={d} className="day-btn" onClick={() => { setAnalyticsDays(d); fetchAnalytics(d); fetchClassTrend(d) }}
                         style={{ background: analyticsDays===d?"#fff":"transparent", color:analyticsDays===d?"#5b5ef4":"#94a3b8", boxShadow:analyticsDays===d?"0 2px 8px rgba(0,0,0,0.1)":"none" }}>
                         {d}d
                       </button>
@@ -1109,9 +1148,9 @@ function FacultyPageContent() {
                   <div style={{ display:"flex", alignItems:"center", gap:8, marginLeft:"auto" }}>
                     <input type="number" min={1} max={365} placeholder="Custom" value={customDays}
                       onChange={e => setCustomDays(e.target.value)}
-                      onKeyDown={e => { if (e.key === "Enter") { const v = parseInt(customDays); if (v > 0) { setAnalyticsDays(v); fetchAnalytics(v) } } }}
+                      onKeyDown={e => { if (e.key === "Enter") { const v = parseInt(customDays); if (v > 0) { setAnalyticsDays(v); fetchAnalytics(v); fetchClassTrend(v) } } }}
                       style={{ width:90, padding:"9px 12px", borderRadius:10, border:"1.5px solid var(--border)", fontSize:13, fontFamily:"var(--font)", outline:"none", color:"var(--text)" }} />
-                    <button onClick={() => { const v=parseInt(customDays); if(v>0){setAnalyticsDays(v);fetchAnalytics(v)} }}
+                    <button onClick={() => { const v=parseInt(customDays); if(v>0){setAnalyticsDays(v);fetchAnalytics(v);fetchClassTrend(v)} }}
                       style={{ padding:"9px 16px", borderRadius:10, border:"1.5px solid var(--accent)", background:"var(--accent-light)", color:"var(--accent)", cursor:"pointer", fontWeight:700, fontSize:13, fontFamily:"var(--font)" }}>
                       Apply
                     </button>
